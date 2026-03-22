@@ -196,15 +196,19 @@ body {
 .btn-blue { background: #2563eb; color: #fff; }
 .btn-red { background: #dc2626; color: #fff; margin-right: auto; }
 
+.status-text {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #6b7280;
+}
+
 @media (max-width: 768px) {
     .page { padding: 8px; }
     .tab-btn { flex: 1; }
     .pin { width: 24px; height: 24px; }
     .pin-label { display: none; }
     .pin-item { align-items: flex-start; }
-    .modal-buttons {
-        flex-direction: column;
-    }
+    .modal-buttons { flex-direction: column; }
     .btn-red { margin-right: 0; }
     .btn { width: 100%; }
 }
@@ -212,18 +216,22 @@ body {
 </head>
 <body>
 <div class="page">
-    <div class="tabs" id="tabs"></div>
+    <div class="tabs" id="tabs">
+        <button type="button" class="tab-btn active" data-id="floor1">1층</button>
+        <button type="button" class="tab-btn" data-id="floor2">2층</button>
+    </div>
 
     <div class="board-wrap">
         <div class="image-wrap" id="imageWrap">
-            <img id="bgImage" alt="배경 이미지">
+            <img id="bgImage" src="./1.png" alt="1층 배경">
             <div class="pin-layer" id="pinLayer"></div>
         </div>
     </div>
 
     <div class="section">
-        <div class="section-title" id="listTitle"></div>
+        <div class="section-title" id="listTitle">1층 핀 목록</div>
         <div class="pin-list" id="pinList"></div>
+        <div class="status-text" id="statusText"></div>
     </div>
 </div>
 
@@ -273,327 +281,334 @@ body {
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const SUPABASE_URL = 'https://dxghzwuqaqdjrrzsfgxs.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_8HUjVjxFedCupJ2S_G6H6A_gLQ4wm8n';
-const PINS_TABLE = 'pins';
+document.addEventListener('DOMContentLoaded', function () {
+    const SUPABASE_URL = 'https://dxghzwuqaqdjrrzsfgxs.supabase.co';
+    const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_8HUjVjxFedCupJ2S_G6H6A_gLQ4wm8n';
+    const PINS_TABLE = 'pins';
 
-const BOARDS = [
-    { id: 'floor1', name: '1층', image: './1.png' },
-    { id: 'floor2', name: '2층', image: './2.png' }
-];
+    const BOARDS = [
+        { id: 'floor1', name: '1층', image: './1.png' },
+        { id: 'floor2', name: '2층', image: './2.png' }
+    ];
 
-const tabs = document.getElementById('tabs');
-const imageWrap = document.getElementById('imageWrap');
-const bgImage = document.getElementById('bgImage');
-const pinLayer = document.getElementById('pinLayer');
-const listTitle = document.getElementById('listTitle');
-const pinList = document.getElementById('pinList');
+    const tabs = document.getElementById('tabs');
+    const imageWrap = document.getElementById('imageWrap');
+    const bgImage = document.getElementById('bgImage');
+    const pinLayer = document.getElementById('pinLayer');
+    const listTitle = document.getElementById('listTitle');
+    const pinList = document.getElementById('pinList');
+    const statusText = document.getElementById('statusText');
 
-const createModalBackdrop = document.getElementById('createModalBackdrop');
-const pinDate = document.getElementById('pinDate');
-const pinTime = document.getElementById('pinTime');
-const pinName = document.getElementById('pinName');
-const cancelCreateBtn = document.getElementById('cancelCreateBtn');
-const saveBtn = document.getElementById('saveBtn');
+    const createModalBackdrop = document.getElementById('createModalBackdrop');
+    const pinDate = document.getElementById('pinDate');
+    const pinTime = document.getElementById('pinTime');
+    const pinName = document.getElementById('pinName');
+    const cancelCreateBtn = document.getElementById('cancelCreateBtn');
+    const saveBtn = document.getElementById('saveBtn');
 
-const viewModalBackdrop = document.getElementById('viewModalBackdrop');
-const viewDate = document.getElementById('viewDate');
-const viewTime = document.getElementById('viewTime');
-const viewName = document.getElementById('viewName');
-const deleteBtn = document.getElementById('deleteBtn');
-const closeViewBtn = document.getElementById('closeViewBtn');
+    const viewModalBackdrop = document.getElementById('viewModalBackdrop');
+    const viewDate = document.getElementById('viewDate');
+    const viewTime = document.getElementById('viewTime');
+    const viewName = document.getElementById('viewName');
+    const deleteBtn = document.getElementById('deleteBtn');
+    const closeViewBtn = document.getElementById('closeViewBtn');
 
-let currentBoardId = BOARDS[0].id;
-let pendingPoint = null;
-let selectedPinId = null;
-let store = {};
-let supabase = null;
+    let currentBoardId = BOARDS[0].id;
+    let pendingPoint = null;
+    let selectedPinId = null;
+    let store = {};
+    let supabase = null;
 
-function escapeHtml(value) {
-    return String(value)
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
-}
+    function setStatus(message) {
+        statusText.textContent = message || '';
+    }
 
-function getNowInfo() {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const d = String(now.getDate()).padStart(2, '0');
-    const hh = String(now.getHours()).padStart(2, '0');
-    const mm = String(now.getMinutes()).padStart(2, '0');
-    const ss = String(now.getSeconds()).padStart(2, '0');
-    return {
-        date: `${y}-${m}-${d}`,
-        time: `${hh}:${mm}:${ss}`
-    };
-}
+    function escapeHtml(value) {
+        return String(value)
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
 
-function renderTabs() {
-    tabs.innerHTML = BOARDS.map(board => `
-        <button type="button" class="tab-btn ${board.id === currentBoardId ? 'active' : ''}" data-id="${board.id}">
-            ${board.name}
-        </button>
-    `).join('');
-}
+    function getNowInfo() {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const ss = String(now.getSeconds()).padStart(2, '0');
+        return { date: `${y}-${m}-${d}`, time: `${hh}:${mm}:${ss}` };
+    }
 
-function renderImage() {
-    const board = BOARDS.find(item => item.id === currentBoardId);
-    bgImage.src = board.image;
-    bgImage.alt = board.name;
-    listTitle.textContent = `${board.name} 핀 목록`;
-}
+    function getCurrentPins() {
+        return store[currentBoardId] || [];
+    }
 
-function getCurrentPins() {
-    return store[currentBoardId] || [];
-}
+    function renderTabs() {
+        tabs.innerHTML = BOARDS.map(board => `
+            <button type="button" class="tab-btn ${board.id === currentBoardId ? 'active' : ''}" data-id="${board.id}">
+                ${board.name}
+            </button>
+        `).join('');
+    }
 
-function renderPins() {
-    const rect = bgImage.getBoundingClientRect();
-    pinLayer.innerHTML = '';
+    function renderImage() {
+        const board = BOARDS.find(item => item.id === currentBoardId) || BOARDS[0];
+        bgImage.src = board.image;
+        bgImage.alt = board.name + ' 배경';
+        listTitle.textContent = `${board.name} 핀 목록`;
+    }
 
-    getCurrentPins().forEach(item => {
-        const x = item.x_ratio * rect.width;
-        const y = item.y_ratio * rect.height;
+    function renderPins() {
+        const rect = bgImage.getBoundingClientRect();
+        pinLayer.innerHTML = '';
 
-        const pin = document.createElement('button');
-        pin.type = 'button';
-        pin.className = 'pin';
-        pin.style.left = `${x}px`;
-        pin.style.top = `${y}px`;
-        pin.dataset.id = item.id;
-        pin.title = `${item.name} / ${item.pin_date} ${item.pin_time}`;
-        pin.addEventListener('click', (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            openViewModal(item.id);
+        getCurrentPins().forEach(item => {
+            const x = item.x_ratio * rect.width;
+            const y = item.y_ratio * rect.height;
+
+            const pin = document.createElement('button');
+            pin.type = 'button';
+            pin.className = 'pin';
+            pin.style.left = `${x}px`;
+            pin.style.top = `${y}px`;
+            pin.dataset.id = item.id;
+            pin.title = `${item.name} / ${item.pin_date} ${item.pin_time}`;
+            pin.addEventListener('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                openViewModal(item.id);
+            });
+
+            const label = document.createElement('div');
+            label.className = 'pin-label';
+            label.style.left = `${x}px`;
+            label.style.top = `${y}px`;
+            label.textContent = `${item.name} (${item.pin_date} ${item.pin_time})`;
+
+            pinLayer.appendChild(pin);
+            pinLayer.appendChild(label);
+        });
+    }
+
+    function renderList() {
+        const pins = getCurrentPins();
+        if (pins.length === 0) {
+            pinList.innerHTML = '<div class="empty-text">저장된 핀이 없습니다.</div>';
+            return;
+        }
+
+        pinList.innerHTML = pins.map((item, index) => `
+            <div class="pin-item">
+                <div class="pin-item-text">${index + 1}. 이름: ${escapeHtml(item.name)} / 날짜: ${item.pin_date} / 시간: ${item.pin_time}</div>
+                <button type="button" class="delete-btn" data-id="${item.id}">삭제</button>
+            </div>
+        `).join('');
+    }
+
+    function renderAll() {
+        renderTabs();
+        renderImage();
+        renderPins();
+        renderList();
+    }
+
+    function openCreateModal(point) {
+        pendingPoint = point;
+        const nowInfo = getNowInfo();
+        pinDate.value = nowInfo.date;
+        pinTime.value = nowInfo.time;
+        pinName.value = '';
+        createModalBackdrop.style.display = 'flex';
+        setTimeout(() => pinName.focus(), 0);
+    }
+
+    function closeCreateModal() {
+        createModalBackdrop.style.display = 'none';
+        pendingPoint = null;
+    }
+
+    function openViewModal(pinId) {
+        const pin = getCurrentPins().find(item => item.id === pinId);
+        if (!pin) return;
+        selectedPinId = pinId;
+        viewDate.textContent = pin.pin_date;
+        viewTime.textContent = pin.pin_time;
+        viewName.textContent = pin.name;
+        viewModalBackdrop.style.display = 'flex';
+    }
+
+    function closeViewModal() {
+        viewModalBackdrop.style.display = 'none';
+        selectedPinId = null;
+    }
+
+    async function loadPins() {
+        if (!supabase) {
+            setStatus('공용 저장소 연결 전입니다.');
+            return;
+        }
+
+        const { data, error } = await supabase
+            .from(PINS_TABLE)
+            .select('id, board_id, x_ratio, y_ratio, name, pin_date, pin_time, created_at')
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            console.error(error);
+            setStatus('핀 목록을 불러오지 못했습니다.');
+            return;
+        }
+
+        store = {};
+        BOARDS.forEach(board => {
+            store[board.id] = [];
         });
 
-        const label = document.createElement('div');
-        label.className = 'pin-label';
-        label.style.left = `${x}px`;
-        label.style.top = `${y}px`;
-        label.textContent = `${item.name} (${item.pin_date} ${item.pin_time})`;
+        (data || []).forEach(item => {
+            if (!Array.isArray(store[item.board_id])) {
+                store[item.board_id] = [];
+            }
+            store[item.board_id].push(item);
+        });
 
-        pinLayer.appendChild(pin);
-        pinLayer.appendChild(label);
-    });
-}
-
-function renderList() {
-    const pins = getCurrentPins();
-    if (pins.length === 0) {
-        pinList.innerHTML = '<div class="empty-text">저장된 핀이 없습니다.</div>';
-        return;
+        renderAll();
+        setStatus('공용 저장소 연결됨');
     }
 
-    pinList.innerHTML = pins.map((item, index) => `
-        <div class="pin-item">
-            <div class="pin-item-text">${index + 1}. 이름: ${escapeHtml(item.name)} / 날짜: ${item.pin_date} / 시간: ${item.pin_time}</div>
-            <button type="button" class="delete-btn" data-id="${item.id}">삭제</button>
-        </div>
-    `).join('');
-}
-
-function renderAll() {
-    renderTabs();
-    renderImage();
-    renderPins();
-    renderList();
-}
-
-function openCreateModal(point) {
-    pendingPoint = point;
-    const nowInfo = getNowInfo();
-    pinDate.value = nowInfo.date;
-    pinTime.value = nowInfo.time;
-    pinName.value = '';
-    createModalBackdrop.style.display = 'flex';
-    setTimeout(() => pinName.focus(), 0);
-}
-
-function closeCreateModal() {
-    createModalBackdrop.style.display = 'none';
-    pendingPoint = null;
-}
-
-function openViewModal(pinId) {
-    const pin = getCurrentPins().find(item => item.id === pinId);
-    if (!pin) return;
-    selectedPinId = pinId;
-    viewDate.textContent = pin.pin_date;
-    viewTime.textContent = pin.pin_time;
-    viewName.textContent = pin.name;
-    viewModalBackdrop.style.display = 'flex';
-}
-
-function closeViewModal() {
-    viewModalBackdrop.style.display = 'none';
-    selectedPinId = null;
-}
-
-async function loadPins() {
-    const { data, error } = await supabase
-        .from(PINS_TABLE)
-        .select('id, board_id, x_ratio, y_ratio, name, pin_date, pin_time, created_at')
-        .order('created_at', { ascending: true });
-
-    if (error) {
-        console.error(error);
-        alert('핀 목록을 불러오지 못했습니다.');
-        return;
-    }
-
-    store = {};
-    BOARDS.forEach(board => {
-        store[board.id] = [];
-    });
-
-    data.forEach(item => {
-        if (!Array.isArray(store[item.board_id])) {
-            store[item.board_id] = [];
+    async function createPin(payload) {
+        if (!supabase) {
+            alert('Supabase 연결이 아직 준비되지 않았습니다.');
+            return false;
         }
-        store[item.board_id].push(item);
-    });
+
+        const { error } = await supabase.from(PINS_TABLE).insert(payload);
+        if (error) {
+            console.error(error);
+            alert('핀 저장에 실패했습니다.');
+            return false;
+        }
+
+        await loadPins();
+        return true;
+    }
+
+    async function deletePin(pinId) {
+        const target = getCurrentPins().find(item => item.id === pinId);
+        if (!target) return false;
+
+        const ok = confirm(`${target.name} 핀을 삭제하시겠습니까?`);
+        if (!ok) return false;
+
+        const { error } = await supabase.from(PINS_TABLE).delete().eq('id', pinId);
+        if (error) {
+            console.error(error);
+            alert('핀 삭제에 실패했습니다.');
+            return false;
+        }
+
+        await loadPins();
+        closeViewModal();
+        return true;
+    }
 
     renderAll();
-}
+    setStatus('화면 초기화 완료');
 
-async function createPin(payload) {
-    const { error } = await supabase.from(PINS_TABLE).insert(payload);
-    if (error) {
-        console.error(error);
-        alert('핀 저장에 실패했습니다.');
-        return false;
-    }
-    await loadPins();
-    return true;
-}
-
-async function deletePin(pinId) {
-    const target = getCurrentPins().find(item => item.id === pinId);
-    if (!target) return false;
-
-    const ok = confirm(`${target.name} 핀을 삭제하시겠습니까?`);
-    if (!ok) return false;
-
-    const { error } = await supabase.from(PINS_TABLE).delete().eq('id', pinId);
-    if (error) {
-        console.error(error);
-        alert('핀 삭제에 실패했습니다.');
-        return false;
-    }
-
-    await loadPins();
-    closeViewModal();
-    return true;
-}
-
-function validateConfig() {
-    if (
-        !SUPABASE_URL ||
-        !SUPABASE_PUBLISHABLE_KEY ||
-        SUPABASE_URL.includes('https://dxghzwuqaqdjrrzsfgxs.supabase.co') ||
-        SUPABASE_PUBLISHABLE_KEY.includes('sb_publishable_8HUjVjxFedCupJ2S_G6H6A_gLQ4wm8n')
-    ) {
-        alert('Supabase URL 또는 Publishable Key를 먼저 입력해주세요.');
-        return false;
-    }
-    return true;
-}
-
-tabs.addEventListener('click', (event) => {
-    const button = event.target.closest('.tab-btn[data-id]');
-    if (!button) return;
-    currentBoardId = button.dataset.id;
-    closeCreateModal();
-    closeViewModal();
-    renderAll();
-});
-
-imageWrap.addEventListener('click', (event) => {
-    if (event.target !== bgImage && event.target !== pinLayer && event.target !== imageWrap) return;
-
-    const rect = bgImage.getBoundingClientRect();
-    const clickX = event.clientX - rect.left;
-    const clickY = event.clientY - rect.top;
-
-    if (clickX < 0 || clickY < 0 || clickX > rect.width || clickY > rect.height) return;
-
-    openCreateModal({
-        xRatio: clickX / rect.width,
-        yRatio: clickY / rect.height
-    });
-});
-
-pinList.addEventListener('click', async (event) => {
-    const button = event.target.closest('button.delete-btn[data-id]');
-    if (!button) return;
-    event.preventDefault();
-    event.stopPropagation();
-    await deletePin(button.dataset.id);
-});
-
-saveBtn.addEventListener('click', async () => {
-    if (!pendingPoint) return;
-
-    const name = pinName.value.trim();
-    if (!name) {
-        alert('이름을 입력해주세요.');
-        pinName.focus();
-        return;
-    }
-
-    const ok = await createPin({
-        board_id: currentBoardId,
-        x_ratio: pendingPoint.xRatio,
-        y_ratio: pendingPoint.yRatio,
-        name: name,
-        pin_date: pinDate.value,
-        pin_time: pinTime.value
-    });
-
-    if (ok) {
+    tabs.addEventListener('click', function (event) {
+        const button = event.target.closest('.tab-btn[data-id]');
+        if (!button) return;
+        currentBoardId = button.dataset.id;
         closeCreateModal();
+        closeViewModal();
+        renderAll();
+    });
+
+    imageWrap.addEventListener('click', function (event) {
+        if (event.target !== bgImage && event.target !== pinLayer && event.target !== imageWrap) return;
+
+        const rect = bgImage.getBoundingClientRect();
+        const clickX = event.clientX - rect.left;
+        const clickY = event.clientY - rect.top;
+
+        if (clickX < 0 || clickY < 0 || clickX > rect.width || clickY > rect.height) return;
+
+        openCreateModal({
+            xRatio: clickX / rect.width,
+            yRatio: clickY / rect.height
+        });
+    });
+
+    pinList.addEventListener('click', async function (event) {
+        const button = event.target.closest('button.delete-btn[data-id]');
+        if (!button) return;
+        event.preventDefault();
+        event.stopPropagation();
+        await deletePin(button.dataset.id);
+    });
+
+    saveBtn.addEventListener('click', async function () {
+        if (!pendingPoint) return;
+
+        const name = pinName.value.trim();
+        if (!name) {
+            alert('이름을 입력해주세요.');
+            pinName.focus();
+            return;
+        }
+
+        const ok = await createPin({
+            board_id: currentBoardId,
+            x_ratio: pendingPoint.xRatio,
+            y_ratio: pendingPoint.yRatio,
+            name: name,
+            pin_date: pinDate.value,
+            pin_time: pinTime.value
+        });
+
+        if (ok) {
+            closeCreateModal();
+        }
+    });
+
+    cancelCreateBtn.addEventListener('click', closeCreateModal);
+    closeViewBtn.addEventListener('click', closeViewModal);
+    deleteBtn.addEventListener('click', async function () {
+        if (!selectedPinId) return;
+        await deletePin(selectedPinId);
+    });
+
+    createModalBackdrop.addEventListener('click', function (event) {
+        if (event.target === createModalBackdrop) closeCreateModal();
+    });
+
+    viewModalBackdrop.addEventListener('click', function (event) {
+        if (event.target === viewModalBackdrop) closeViewModal();
+    });
+
+    window.addEventListener('resize', function () {
+        renderPins();
+    });
+
+    bgImage.addEventListener('load', function () {
+        renderPins();
+    });
+
+    try {
+        if (window.supabase && typeof window.supabase.createClient === 'function') {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+            loadPins();
+        } else {
+            setStatus('Supabase 라이브러리를 불러오지 못했습니다.');
+        }
+    } catch (error) {
+        console.error(error);
+        setStatus('Supabase 초기화에 실패했습니다.');
     }
 });
-
-cancelCreateBtn.addEventListener('click', closeCreateModal);
-closeViewBtn.addEventListener('click', closeViewModal);
-deleteBtn.addEventListener('click', async () => {
-    if (!selectedPinId) return;
-    await deletePin(selectedPinId);
-});
-
-createModalBackdrop.addEventListener('click', (event) => {
-    if (event.target === createModalBackdrop) closeCreateModal();
-});
-
-viewModalBackdrop.addEventListener('click', (event) => {
-    if (event.target === viewModalBackdrop) closeViewModal();
-});
-
-window.addEventListener('resize', () => {
-    renderPins();
-});
-
-bgImage.addEventListener('load', () => {
-    renderPins();
-});
-
-(async function init() {
-    renderAll();
-
-    if (!validateConfig()) {
-        return;
-    }
-
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-    await loadPins();
-})();
 </script>
 </body>
 </html>
