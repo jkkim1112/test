@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>층별 핀 관리</title>
+<style>
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f3f4f6;
+    color: #111827;
+    font-size: 14px;
+}
+.page {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 10px;
+}
+.tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+.tab-btn {
+    border: none;
+    border-radius: 8px;
+    padding: 9px 14px;
+    background: #d1d5db;
+    color: #111827;
+    font-size: 14px;
+    cursor: pointer;
+}
+.tab-btn.active {
+    background: #2563eb;
+    color: #fff;
+}
+.board-wrap {
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    overflow: hidden;
+}
+.image-wrap {
+    position: relative;
+    width: 100%;
+    background: #fff;
+    line-height: 0;
+}
+.image-wrap img {
+    display: block;
+    width: 100%;
+    height: auto;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+.pin-layer {
+    position: absolute;
+    inset: 0;
+}
+.pin {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    transform: translate(-50%, -50%);
+    border: 2px solid #fff;
+    border-radius: 50%;
+    background: #dc2626;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.28);
+    cursor: pointer;
+    z-index: 2;
+}
+.pin-label {
+    position: absolute;
+    transform: translate(-50%, calc(-100% - 8px));
+    background: rgba(17,24,39,0.88);
+    color: #fff;
+    padding: 3px 6px;
+    border-radius: 5px;
+    font-size: 11px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 1;
+}
+.section {
+    margin-top: 10px;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    padding: 10px;
+}
+.section-title {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+.pin-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+.pin-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+.pin-item:last-child {
+    border-bottom: none;
+}
+.pin-item-text {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 13px;
+}
+.delete-btn {
+    border: none;
+    border-radius: 6px;
+    background: #dc2626;
+    color: #fff;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+.empty-text {
+    color: #6b7280;
+    font-size: 13px;
+    padding: 6px 0;
+}
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.45);
+    z-index: 1000;
+    padding: 16px;
+}
+.modal {
+    width: 100%;
+    max-width: 340px;
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.22);
+}
+.modal h3 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+}
+.form-row, .view-row {
+    margin-bottom: 10px;
+}
+.form-row label, .view-label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 13px;
+    font-weight: bold;
+}
+.form-row input {
+    width: 100%;
+    padding: 10px;
+    font-size: 15px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+}
+.view-value {
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #f9fafb;
+    font-size: 13px;
+}
+.modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+}
+.btn {
+    border: none;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    cursor: pointer;
+}
+.btn-gray { background: #d1d5db; color: #111827; }
+.btn-blue { background: #2563eb; color: #fff; }
+.btn-red { background: #dc2626; color: #fff; margin-right: auto; }
+
+@media (max-width: 768px) {
+    .page { padding: 8px; }
+    .tab-btn { flex: 1; }
+    .pin { width: 24px; height: 24px; }
+    .pin-label { display: none; }
+    .pin-item { align-items: flex-start; }
+    .modal-buttons {
+        flex-direction: column;
+    }
+    .btn-red { margin-right: 0; }
+    .btn { width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+    <div class="tabs" id="tabs"></div>
+
+    <div class="board-wrap">
+        <div class="image-wrap" id="imageWrap">
+            <img id="bgImage" alt="배경 이미지">
+            <div class="pin-layer" id="pinLayer"></div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title" id="listTitle"></div>
+        <div class="pin-list" id="pinList"></div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="createModalBackdrop">
+    <div class="modal">
+        <h3>핀 정보 입력</h3>
+        <div class="form-row">
+            <label for="pinDate">날짜</label>
+            <input type="text" id="pinDate" readonly>
+        </div>
+        <div class="form-row">
+            <label for="pinTime">시간</label>
+            <input type="text" id="pinTime" readonly>
+        </div>
+        <div class="form-row">
+            <label for="pinName">이름</label>
+            <input type="text" id="pinName" placeholder="이름을 입력해주세요">
+        </div>
+        <div class="modal-buttons">
+            <button class="btn btn-gray" id="cancelCreateBtn" type="button">취소</button>
+            <button class="btn btn-blue" id="saveBtn" type="button">저장</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="viewModalBackdrop">
+    <div class="modal">
+        <h3>핀 정보</h3>
+        <div class="view-row">
+            <div class="view-label">날짜</div>
+            <div class="view-value" id="viewDate"></div>
+        </div>
+        <div class="view-row">
+            <div class="view-label">시간</div>
+            <div class="view-value" id="viewTime"></div>
+        </div>
+        <div class="view-row">
+            <div class="view-label">이름</div>
+            <div class="view-value" id="viewName"></div>
+        </div>
+        <div class="modal-buttons">
+            <button class="btn btn-red" id="deleteBtn" type="button">삭제</button>
+            <button class="btn btn-gray" id="closeViewBtn" type="button">닫기</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'floor_pin_store_v2';
+const BOARDS = [
+    {
+        id: 'floor1',
+        name: '1층',
+        image: './1.png'
+    },
+    {
+        id: 'floor2',
+        name: '2층',
+        image: './2.png'
+    }
+];
+
+const tabs = document.getElementById('tabs');
+const imageWrap = document.getElementById('imageWrap');
+const bgImage = document.getElementById('bgImage');
+const pinLayer = document.getElementById('pinLayer');
+const listTitle = document.getElementById('listTitle');
+const pinList = document.getElementById('pinList');
+
+const createModalBackdrop = document.getElementById('createModalBackdrop');
+const pinDate = document.getElementById('pinDate');
+const pinTime = document.getElementById('pinTime');
+const pinName = document.getElementById('pinName');
+const cancelCreateBtn = document.getElementById('cancelCreateBtn');
+const saveBtn = document.getElementById('saveBtn');
+
+const viewModalBackdrop = document.getElementById('viewModalBackdrop');
+const viewDate = document.getElementById('viewDate');
+const viewTime = document.getElementById('viewTime');
+const viewName = document.getElementById('viewName');
+const deleteBtn = document.getElementById('deleteBtn');
+const closeViewBtn = document.getElementById('closeViewBtn');
+
+let currentBoardId = BOARDS[0].id;
+let pendingPoint = null;
+let selectedPinId = null;
+let store = {};
+
+function initStore() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+        try {
+            store = JSON.parse(raw) || {};
+        } catch (e) {
+            store = {};
+        }
+    }
+    BOARDS.forEach(board => {
+        if (!Array.isArray(store[board.id])) {
+            store[board.id] = [];
+        }
+    });
+}
+
+function saveStore() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+}
+
+function getCurrentPins() {
+    return store[currentBoardId] || [];
+}
+
+function setCurrentPins(pins) {
+    store[currentBoardId] = pins;
+    saveStore();
+}
+
+function getNowInfo() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    return {
+        date: `${y}-${m}-${d}`,
+        time: `${hh}:${mm}:${ss}`
+    };
+}
+
+function createId() {
+    return `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function renderTabs() {
+    tabs.innerHTML = BOARDS.map(board => `
+        <button type="button" class="tab-btn ${board.id === currentBoardId ? 'active' : ''}" data-id="${board.id}">
+            ${board.name}
+        </button>
+    `).join('');
+}
+
+function renderImage() {
+    const board = BOARDS.find(item => item.id === currentBoardId);
+    bgImage.src = board.image;
+    bgImage.alt = board.name;
+    listTitle.textContent = `${board.name} 핀 목록`;
+}
+
+function renderPins() {
+    const rect = bgImage.getBoundingClientRect();
+    pinLayer.innerHTML = '';
+
+    getCurrentPins().forEach(item => {
+        const x = item.xRatio * rect.width;
+        const y = item.yRatio * rect.height;
+
+        const pin = document.createElement('button');
+        pin.type = 'button';
+        pin.className = 'pin';
+        pin.style.left = `${x}px`;
+        pin.style.top = `${y}px`;
+        pin.dataset.id = item.id;
+        pin.title = `${item.name} / ${item.date} ${item.time}`;
+        pin.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            openViewModal(item.id);
+        });
+
+        const label = document.createElement('div');
+        label.className = 'pin-label';
+        label.style.left = `${x}px`;
+        label.style.top = `${y}px`;
+        label.textContent = `${item.name} (${item.date} ${item.time})`;
+
+        pinLayer.appendChild(pin);
+        pinLayer.appendChild(label);
+    });
+}
+
+function renderList() {
+    const pins = getCurrentPins();
+    if (pins.length === 0) {
+        pinList.innerHTML = '<div class="empty-text">저장된 핀이 없습니다.</div>';
+        return;
+    }
+
+    pinList.innerHTML = pins.map((item, index) => `
+        <div class="pin-item">
+            <div class="pin-item-text">${index + 1}. 이름: ${escapeHtml(item.name)} / 날짜: ${item.date} / 시간: ${item.time}</div>
+            <button type="button" class="delete-btn" data-id="${item.id}">삭제</button>
+        </div>
+    `).join('');
+}
+
+function renderAll() {
+    renderTabs();
+    renderImage();
+    renderPins();
+    renderList();
+}
+
+function openCreateModal(point) {
+    pendingPoint = point;
+    const nowInfo = getNowInfo();
+    pinDate.value = nowInfo.date;
+    pinTime.value = nowInfo.time;
+    pinName.value = '';
+    createModalBackdrop.style.display = 'flex';
+    setTimeout(() => pinName.focus(), 0);
+}
+
+function closeCreateModal() {
+    createModalBackdrop.style.display = 'none';
+    pendingPoint = null;
+}
+
+function openViewModal(pinId) {
+    const pin = getCurrentPins().find(item => item.id === pinId);
+    if (!pin) return;
+    selectedPinId = pinId;
+    viewDate.textContent = pin.date;
+    viewTime.textContent = pin.time;
+    viewName.textContent = pin.name;
+    viewModalBackdrop.style.display = 'flex';
+}
+
+function closeViewModal() {
+    viewModalBackdrop.style.display = 'none';
+    selectedPinId = null;
+}
+
+function deletePin(pinId) {
+    const pins = getCurrentPins();
+    const target = pins.find(item => item.id === pinId);
+    if (!target) return false;
+
+    const ok = confirm(`${target.name} 핀을 삭제하시겠습니까?`);
+    if (!ok) return false;
+
+    setCurrentPins(pins.filter(item => item.id !== pinId));
+    renderAll();
+    closeViewModal();
+    return true;
+}
+
+tabs.addEventListener('click', (event) => {
+    const button = event.target.closest('.tab-btn[data-id]');
+    if (!button) return;
+    currentBoardId = button.dataset.id;
+    closeCreateModal();
+    closeViewModal();
+    renderAll();
+});
+
+imageWrap.addEventListener('click', (event) => {
+    if (event.target !== bgImage && event.target !== pinLayer && event.target !== imageWrap) return;
+
+    const rect = bgImage.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const clickY = event.clientY - rect.top;
+
+    if (clickX < 0 || clickY < 0 || clickX > rect.width || clickY > rect.height) return;
+
+    openCreateModal({
+        xRatio: clickX / rect.width,
+        yRatio: clickY / rect.height
+    });
+});
+
+pinList.addEventListener('click', (event) => {
+    const button = event.target.closest('button.delete-btn[data-id]');
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    deletePin(button.dataset.id);
+});
+
+saveBtn.addEventListener('click', () => {
+    if (!pendingPoint) return;
+
+    const name = pinName.value.trim();
+    if (!name) {
+        alert('이름을 입력해주세요.');
+        pinName.focus();
+        return;
+    }
+
+    const pins = getCurrentPins().slice();
+    pins.push({
+        id: createId(),
+        xRatio: pendingPoint.xRatio,
+        yRatio: pendingPoint.yRatio,
+        name: name,
+        date: pinDate.value,
+        time: pinTime.value
+    });
+    setCurrentPins(pins);
+    renderAll();
+    closeCreateModal();
+});
+
+cancelCreateBtn.addEventListener('click', closeCreateModal);
+closeViewBtn.addEventListener('click', closeViewModal);
+deleteBtn.addEventListener('click', () => {
+    if (!selectedPinId) return;
+    deletePin(selectedPinId);
+});
+
+createModalBackdrop.addEventListener('click', (event) => {
+    if (event.target === createModalBackdrop) closeCreateModal();
+});
+viewModalBackdrop.addEventListener('click', (event) => {
+    if (event.target === viewModalBackdrop) closeViewModal();
+});
+
+window.addEventListener('resize', () => {
+    renderPins();
+});
+
+bgImage.addEventListener('load', () => {
+    renderPins();
+});
+
+initStore();
+renderAll();
+</script>
+</body>
+</html>
