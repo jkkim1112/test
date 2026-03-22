@@ -300,8 +300,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const statusText = document.getElementById('statusText');
 
     const createModalBackdrop = document.getElementById('createModalBackdrop');
-    const pinDate = document.getElementById('pinDate');
-    const pinTime = document.getElementById('pinTime');
     const pinName = document.getElementById('pinName');
     const cancelCreateBtn = document.getElementById('cancelCreateBtn');
     const saveBtn = document.getElementById('saveBtn');
@@ -418,9 +416,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function openCreateModal(point) {
         pendingPoint = point;
-        const nowInfo = getNowInfo();
-        pinDate.value = nowInfo.date;
-        pinTime.value = nowInfo.time;
         pinName.value = '';
         createModalBackdrop.style.display = 'flex';
         setTimeout(() => pinName.focus(), 0);
@@ -451,6 +446,8 @@ document.addEventListener('DOMContentLoaded', function () {
             setStatus('공용 저장소 연결 전입니다.');
             return;
         }
+
+        setStatus('데이터를 다시 불러오는 중입니다.');
 
         const { data, error } = await supabase
             .from(PINS_TABLE)
@@ -518,13 +515,17 @@ document.addEventListener('DOMContentLoaded', function () {
     renderAll();
     setStatus('화면 초기화 완료');
 
-    tabs.addEventListener('click', function (event) {
+    tabs.addEventListener('click', async function (event) {
         const button = event.target.closest('.tab-btn[data-id]');
         if (!button) return;
         currentBoardId = button.dataset.id;
         closeCreateModal();
         closeViewModal();
         renderAll();
+
+        if (supabase) {
+            await loadPins();
+        }
     });
 
     imageWrap.addEventListener('click', function (event) {
@@ -560,13 +561,15 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        const nowInfo = getNowInfo();
+
         const ok = await createPin({
             board_id: currentBoardId,
             x_ratio: pendingPoint.xRatio,
             y_ratio: pendingPoint.yRatio,
             name: name,
-            pin_date: pinDate.value,
-            pin_time: pinTime.value
+            pin_date: nowInfo.date,
+            pin_time: nowInfo.time
         });
 
         if (ok) {
