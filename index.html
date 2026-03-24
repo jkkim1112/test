@@ -335,6 +335,17 @@ document.addEventListener('DOMContentLoaded', function () {
         return store[currentBoardId] || [];
     }
 
+
+    function findPinByName(name) {
+        const targetName = name.trim();
+        for (const boardId in store) {
+            const pins = Array.isArray(store[boardId]) ? store[boardId] : [];
+            const found = pins.find(item => item.name === targetName);
+            if (found) return found;
+        }
+        return null;
+    }
+
     function renderTabs() {
         tabs.innerHTML = BOARDS.map(board => `
             <button type="button" class="tab-btn ${board.id === currentBoardId ? 'active' : ''}" data-id="${board.id}">
@@ -549,6 +560,20 @@ document.addEventListener('DOMContentLoaded', function () {
             alert('이름을 입력해주세요.');
             pinName.focus();
             return;
+        }
+
+        const duplicatedPin = findPinByName(name);
+        if (duplicatedPin) {
+            const shouldReplace = confirm('같은 이름의 핀이 이미 등록되어 있습니다. 기존 핀을 삭제하고 새 위치로 등록하시겠습니까?');
+            if (!shouldReplace) {
+                pinName.focus();
+                return;
+            }
+
+            const deleted = await deletePin(duplicatedPin.id);
+            if (!deleted) {
+                return;
+            }
         }
 
         const nowInfo = getNowInfo();
