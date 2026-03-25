@@ -514,8 +514,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!pin) return;
         const meta = parsePinMeta(pin.name);
         selectedPinId = pinId;
-        const dateText = String(pin.pin_date || '').replaceAll('-', '/');
-        const timeText = String(pin.pin_time || '').slice(0, 5);
+        const dateText = String(pin.pin_date || '');
+        const timeText = String(pin.pin_time || '').slice(0, 8);
         viewName.textContent = meta.displayName;
         viewWeapon.textContent = meta.weapon;
         viewDateTime.textContent = `${dateText} ${timeText}`.trim();
