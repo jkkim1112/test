@@ -18,6 +18,12 @@ body {
     margin: 0 auto;
     padding: 10px;
 }
+.page-title {
+    font-size: 26px;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 18px;
+}
 .tabs {
     display: flex;
     gap: 6px;
@@ -73,7 +79,7 @@ body {
 }
 .pin-label {
     position: absolute;
-    transform: translate(-50%, calc(-100% - 8px));
+    transform: translate(-50%, calc(-100% - 16px));
     background: rgba(17,24,39,0.88);
     color: #fff;
     padding: 3px 6px;
@@ -159,18 +165,31 @@ body {
 .form-row, .view-row {
     margin-bottom: 10px;
 }
+.form-row,
+.view-row {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    align-items: center;
+    gap: 6px;
+}
 .form-row label, .view-label {
     display: block;
     margin-bottom: 5px;
     font-size: 13px;
     font-weight: bold;
 }
-.form-row input {
+.form-row label,
+.view-label {
+    margin-bottom: 0;
+}
+.form-row input,
+.form-row select {
     width: 100%;
     padding: 10px;
     font-size: 15px;
     border: 1px solid #d1d5db;
     border-radius: 6px;
+    box-sizing: border-box;
 }
 .view-value {
     padding: 8px 10px;
@@ -202,18 +221,33 @@ body {
 }
 @media (max-width: 768px) {
     .page { padding: 8px; }
+    .page-title {
+        font-size: 20px;
+        margin-bottom: 14px;
+    }
     .tab-btn { flex: 1; }
     .pin { width: 14px; height: 14px; }
-    .pin-label { display: none; }
+    .pin-label {
+        display: block;
+        padding: 2px 4px;
+        font-size: 9px;
+        border-radius: 4px;
+        transform: translate(-50%, calc(-100% - 10px));
+    }
     .pin-item { align-items: flex-start; }
     .modal-buttons { flex-direction: column; }
     .btn-red { margin-right: 0; }
     .btn { width: 100%; }
+    .form-row {
+        grid-template-columns: 44px 1fr;
+    }
 }
 </style>
 </head>
 <body>
 <div class="page">
+    <div class="page-title">검은 마녀의 탑 위치 현황</div>
+
     <div class="tabs" id="tabs">
         <button type="button" class="tab-btn active" data-id="floor1">1층</button>
         <button type="button" class="tab-btn" data-id="floor2">2층</button>
@@ -237,8 +271,24 @@ body {
     <div class="modal">
         <h3>핀 정보 입력</h3>
         <div class="form-row">
-            <label for="pinName">이름</label>
+            <label for="pinName">이름 :</label>
             <input type="text" id="pinName" placeholder="이름을 입력해주세요">
+        </div>
+        <div class="form-row">
+            <label for="pinWeapon">무기 :</label>
+            <select id="pinWeapon">
+                <option value="입력 안함">입력 안함</option>
+                <option value="검과방패">검과방패</option>
+                <option value="전투봉">전투봉</option>
+                <option value="활">활</option>
+                <option value="석궁">석궁</option>
+                <option value="지팡이">지팡이</option>
+                <option value="사이드">사이드</option>
+                <option value="전투방패">전투방패</option>
+                <option value="단검">단검</option>
+                <option value="대검">대검</option>
+                <option value="맨손">맨손</option>
+            </select>
         </div>
         <div class="modal-buttons">
             <button class="btn btn-gray" id="cancelCreateBtn" type="button">취소</button>
@@ -251,16 +301,16 @@ body {
     <div class="modal">
         <h3>핀 정보</h3>
         <div class="view-row">
-            <div class="view-label">날짜</div>
-            <div class="view-value" id="viewDate"></div>
+            <div class="view-label">이름</div>
+            <div class="view-value" id="viewName"></div>
+        </div>
+        <div class="view-row">
+            <div class="view-label">무기</div>
+            <div class="view-value" id="viewWeapon"></div>
         </div>
         <div class="view-row">
             <div class="view-label">시간</div>
-            <div class="view-value" id="viewTime"></div>
-        </div>
-        <div class="view-row">
-            <div class="view-label">이름</div>
-            <div class="view-value" id="viewName"></div>
+            <div class="view-value" id="viewDateTime"></div>
         </div>
         <div class="modal-buttons">
             <button class="btn btn-red" id="deleteBtn" type="button">삭제</button>
@@ -291,13 +341,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const createModalBackdrop = document.getElementById('createModalBackdrop');
     const pinName = document.getElementById('pinName');
+    const pinWeapon = document.getElementById('pinWeapon');
     const cancelCreateBtn = document.getElementById('cancelCreateBtn');
     const saveBtn = document.getElementById('saveBtn');
 
     const viewModalBackdrop = document.getElementById('viewModalBackdrop');
-    const viewDate = document.getElementById('viewDate');
-    const viewTime = document.getElementById('viewTime');
+    const viewDateTime = document.getElementById('viewDateTime');
     const viewName = document.getElementById('viewName');
+    const viewWeapon = document.getElementById('viewWeapon');
     const deleteBtn = document.getElementById('deleteBtn');
     const closeViewBtn = document.getElementById('closeViewBtn');
 
@@ -320,6 +371,28 @@ document.addEventListener('DOMContentLoaded', function () {
             .replaceAll("'", '&#39;');
     }
 
+
+    function parsePinMeta(rawName) {
+        const text = String(rawName || '').trim();
+        const match = text.match(/^이름\s*:\s*(.*?)\s*\/\s*무기\s*:\s*(.*)$/);
+        if (match) {
+            return {
+                displayName: match[1].trim(),
+                weapon: match[2].trim() || '입력 안함',
+                rawName: text
+            };
+        }
+        return {
+            displayName: text,
+            weapon: '입력 안함',
+            rawName: text
+        };
+    }
+
+    function buildStoredName(name, weapon) {
+        return `이름 : ${name} / 무기 : ${weapon}`;
+    }
+
     function getNowInfo() {
         const now = new Date();
         const y = now.getFullYear();
@@ -340,7 +413,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const targetName = name.trim();
         for (const boardId in store) {
             const pins = Array.isArray(store[boardId]) ? store[boardId] : [];
-            const found = pins.find(item => item.name === targetName);
+            const found = pins.find(item => parsePinMeta(item.name).displayName === targetName);
             if (found) return found;
         }
         return null;
@@ -366,6 +439,7 @@ document.addEventListener('DOMContentLoaded', function () {
         pinLayer.innerHTML = '';
 
         getCurrentPins().forEach(item => {
+            const meta = parsePinMeta(item.name);
             const x = item.x_ratio * rect.width;
             const y = item.y_ratio * rect.height;
 
@@ -375,7 +449,9 @@ document.addEventListener('DOMContentLoaded', function () {
             pin.style.left = `${x}px`;
             pin.style.top = `${y}px`;
             pin.dataset.id = item.id;
-            pin.title = `${item.name} / ${item.pin_date} ${item.pin_time}`;
+            pin.title = meta.weapon === '입력 안함'
+                ? `이름: ${meta.displayName}`
+                : `이름: ${meta.displayName} / 무기: ${meta.weapon}`;
             pin.addEventListener('click', function (event) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -386,7 +462,9 @@ document.addEventListener('DOMContentLoaded', function () {
             label.className = 'pin-label';
             label.style.left = `${x}px`;
             label.style.top = `${y}px`;
-            label.textContent = `${item.name} (${item.pin_date} ${item.pin_time})`;
+            label.textContent = meta.weapon === '입력 안함'
+                ? meta.displayName
+                : `${meta.displayName} / ${meta.weapon}`;
 
             pinLayer.appendChild(pin);
             pinLayer.appendChild(label);
@@ -400,12 +478,15 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        pinList.innerHTML = pins.map((item, index) => `
+        pinList.innerHTML = pins.map((item, index) => {
+            const meta = parsePinMeta(item.name);
+            return `
             <div class="pin-item">
-                <div class="pin-item-text">${index + 1}. 이름: ${escapeHtml(item.name)} / 날짜: ${item.pin_date} / 시간: ${item.pin_time}</div>
+                <div class="pin-item-text">${index + 1}. 이름: ${escapeHtml(meta.displayName)} / 무기: ${escapeHtml(meta.weapon)} / 날짜: ${item.pin_date} / 시간: ${item.pin_time}</div>
                 <button type="button" class="delete-btn" data-id="${item.id}">삭제</button>
             </div>
-        `).join('');
+        `;
+        }).join('');
     }
 
     function renderAll() {
@@ -418,6 +499,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function openCreateModal(point) {
         pendingPoint = point;
         pinName.value = '';
+        pinWeapon.value = '입력 안함';
         createModalBackdrop.style.display = 'flex';
         setTimeout(() => pinName.focus(), 0);
     }
@@ -430,10 +512,13 @@ document.addEventListener('DOMContentLoaded', function () {
     function openViewModal(pinId) {
         const pin = getCurrentPins().find(item => item.id === pinId);
         if (!pin) return;
+        const meta = parsePinMeta(pin.name);
         selectedPinId = pinId;
-        viewDate.textContent = pin.pin_date;
-        viewTime.textContent = pin.pin_time;
-        viewName.textContent = pin.name;
+        const dateText = String(pin.pin_date || '').replaceAll('-', '/');
+        const timeText = String(pin.pin_time || '').slice(0, 5);
+        viewName.textContent = meta.displayName;
+        viewWeapon.textContent = meta.weapon;
+        viewDateTime.textContent = `${dateText} ${timeText}`.trim();
         viewModalBackdrop.style.display = 'flex';
     }
 
@@ -498,7 +583,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const target = getCurrentPins().find(item => item.id === pinId);
         if (!target) return false;
 
-        const ok = confirm(`${target.name} 핀을 삭제하시겠습니까?`);
+        const meta = parsePinMeta(target.name);
+        const ok = confirm(`${meta.displayName} 핀을 삭제하시겠습니까?`);
         if (!ok) return false;
 
         const { error } = await supabase.from(PINS_TABLE).delete().eq('id', pinId);
@@ -556,6 +642,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!pendingPoint) return;
 
         const name = pinName.value.trim();
+        const weapon = pinWeapon.value || '입력 안함';
         if (!name) {
             alert('이름을 입력해주세요.');
             pinName.focus();
@@ -582,7 +669,7 @@ document.addEventListener('DOMContentLoaded', function () {
             board_id: currentBoardId,
             x_ratio: pendingPoint.xRatio,
             y_ratio: pendingPoint.yRatio,
-            name: name,
+            name: buildStoredName(name, weapon),
             pin_date: nowInfo.date,
             pin_time: nowInfo.time
         });
