@@ -309,19 +309,21 @@ body {
         padding: 10px;
     }
     .profile-info {
-        gap: 12px;
+        gap: 8px 12px;
         flex-direction: row;
-        align-items: center;
-        justify-content: space-between;
+        align-items: flex-start;
+        justify-content: flex-start;
         width: 100%;
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
     }
     .profile-item {
-        width: auto;
+        width: 100%;
         font-size: 18px;
-        flex: 1;
+        flex: 1 1 100%;
         min-width: 0;
-        white-space: nowrap;
+        white-space: normal;
+        word-break: break-word;
+        overflow-wrap: anywhere;
     }
     .profile-edit-btn {
         width: 100%;
