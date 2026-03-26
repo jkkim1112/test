@@ -220,6 +220,29 @@ body {
     color: #6b7280;
 }
 
+.intro-modal {
+    max-width: 360px;
+}
+.intro-message {
+    font-size: 15px;
+    font-weight: bold;
+    margin-bottom: 12px;
+}
+.intro-info-box {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #f9fafb;
+    padding: 12px;
+    font-size: 14px;
+    line-height: 1.7;
+    margin-bottom: 12px;
+}
+@media (max-width: 768px) {
+    .intro-modal {
+        max-width: 340px;
+    }
+}
+
 .profile-bar {
     display: flex;
     align-items: center;
@@ -339,6 +362,21 @@ body {
     </div>
 </div>
 
+
+<div class="modal-backdrop" id="introModalBackdrop">
+    <div class="modal intro-modal">
+        <h3>안내</h3>
+        <div class="intro-message">아바타, 탈것 확인하세요!!</div>
+        <div class="intro-info-box">
+            <div>아바타 : <span id="introAvatarText">-</span></div>
+            <div>탈것 : <span id="introMountText">-</span></div>
+        </div>
+        <div class="modal-buttons">
+            <button class="btn btn-blue" id="introConfirmBtn" type="button">확인</button>
+        </div>
+    </div>
+</div>
+
 <div class="modal-backdrop" id="createModalBackdrop">
     <div class="modal">
         <h3>핀 정보 입력</h3>
@@ -431,6 +469,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const mountInput = document.getElementById('mountInput');
     const profileCancelBtn = document.getElementById('profileCancelBtn');
     const profileSaveBtn = document.getElementById('profileSaveBtn');
+
+    const introModalBackdrop = document.getElementById('introModalBackdrop');
+    const introAvatarText = document.getElementById('introAvatarText');
+    const introMountText = document.getElementById('introMountText');
+    const introConfirmBtn = document.getElementById('introConfirmBtn');
 
     const tabs = document.getElementById('tabs');
     const imageWrap = document.getElementById('imageWrap');
@@ -527,6 +570,16 @@ document.addEventListener('DOMContentLoaded', function () {
         mountText.textContent = profileInfo.mount_name || '-';
     }
 
+    function openIntroModal() {
+        introAvatarText.textContent = profileInfo.avatar_name || '-';
+        introMountText.textContent = profileInfo.mount_name || '-';
+        introModalBackdrop.style.display = 'flex';
+    }
+
+    function closeIntroModal() {
+        introModalBackdrop.style.display = 'none';
+    }
+
     function openProfileModal() {
         avatarInput.value = profileInfo.avatar_name || '';
         mountInput.value = profileInfo.mount_name || '';
@@ -562,6 +615,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         renderProfile();
+        openIntroModal();
     }
 
     async function saveProfile() {
@@ -861,12 +915,17 @@ document.addEventListener('DOMContentLoaded', function () {
     profileEditBtn.addEventListener('click', openProfileModal);
     profileCancelBtn.addEventListener('click', closeProfileModal);
     profileSaveBtn.addEventListener('click', saveProfile);
+    introConfirmBtn.addEventListener('click', closeIntroModal);
 
     cancelCreateBtn.addEventListener('click', closeCreateModal);
     closeViewBtn.addEventListener('click', closeViewModal);
     deleteBtn.addEventListener('click', async function () {
         if (!selectedPinId) return;
         await deletePin(selectedPinId);
+    });
+
+    introModalBackdrop.addEventListener('click', function (event) {
+        if (event.target === introModalBackdrop) closeIntroModal();
     });
 
     createModalBackdrop.addEventListener('click', function (event) {
